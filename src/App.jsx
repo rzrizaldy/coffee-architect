@@ -293,11 +293,65 @@ function App() {
     setShowLocationModal(true)
   }
 
-  const executeShopSearch = () => {
+  const executeShopSearch = async () => {
+    let location = locationInput
+
+    // If user wants current location, request browser geolocation
+    if (useCurrentLocation) {
+      try {
+        // Request browser location permission
+        const position = await new Promise((resolve, reject) => {
+          if (!navigator.geolocation) {
+            reject(new Error('Geolocation not supported by your browser'))
+          }
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+          })
+        })
+
+        const { latitude, longitude } = position.coords
+
+        // Try to reverse geocode to get city name (using OpenStreetMap Nominatim - free!)
+        try {
+          const geoResponse = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
+          )
+          const geoData = await geoResponse.json()
+          
+          // Extract city name from response
+          location = geoData.address?.city 
+            || geoData.address?.town 
+            || geoData.address?.village 
+            || geoData.address?.county
+            || `coordinates: ${latitude.toFixed(2)}, ${longitude.toFixed(2)}`
+        } catch (geoError) {
+          // If reverse geocoding fails, use coordinates
+          location = `coordinates: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
+        }
+      } catch (error) {
+        // Handle location permission denial or error
+        let errorMsg = 'Unable to get your location. '
+        if (error.code === 1) {
+          errorMsg += 'Location access was denied. Please enable location permissions in your browser settings.'
+        } else if (error.code === 2) {
+          errorMsg += 'Location information is unavailable.'
+        } else if (error.code === 3) {
+          errorMsg += 'Location request timed out.'
+        } else {
+          errorMsg += error.message
+        }
+        
+        setAiResponse(`**ERROR**: ${errorMsg}\n\nPlease enter a city manually instead.`)
+        setAiLoading(false)
+        return
+      }
+    }
+
+    // Now search with the location
     simulateLoading(async () => {
-      let loc = locationInput
-      if (useCurrentLocation) loc = "Current Location"
-      const prompt = `List 3 real specialty coffee shops in ${loc}. Format as markdown list.`
+      const prompt = `List 3 real specialty coffee shops in or near ${location}. Format as markdown list with shop names, addresses, and what they're known for.`
       const response = await callOpenAI(prompt, "You are a coffee scout. Only recommend highly rated specialty shops.")
       setAiResponse(response)
     })
@@ -652,10 +706,17 @@ function App() {
                   onChange={(e) => setUseCurrentLocation(e.target.checked)}
                   className="w-5 h-5 border-2 border-black rounded-none accent-black"
                 />
-                <label htmlFor="useLocation" className="text-sm font-bold cursor-pointer">
-                  USE CURRENT GPS COORDINATES
+                <label htmlFor="useLocation" className="text-sm font-bold cursor-pointer flex items-center gap-2">
+                  <MapPin className="w-4 h-4" />
+                  USE MY CURRENT LOCATION (Browser will request permission)
                 </label>
               </div>
+              
+              {useCurrentLocation && (
+                <div className="p-3 bg-yellow-50 border-2 border-yellow-400 text-xs">
+                  <strong>📍 LOCATION ACCESS:</strong> When you click SCAN, your browser will ask for permission to access your location. Click "Allow" to find nearby coffee shops.
+                </div>
+              )}
             </div>
           )}
         </Modal>
