@@ -1,0 +1,21 @@
+# Netlify Configuration
+
+[build]
+  # Build command
+  command = "npm run build"
+  
+  # Output directory
+  publish = "dist"
+  
+  # Functions directory
+  functions = "netlify/functions"
+
+# Redirect all routes to index.html for SPA routing
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Environment variables hint (actual values set in Netlify dashboard)
+# OPENAI_API_KEY = "your-api-key-here"
+

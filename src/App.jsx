@@ -240,19 +240,20 @@ function App() {
   }
 
   const callOpenAI = async (prompt, systemPrompt) => {
-    const apiKey = import.meta.env.VITE_OPENAI_API_KEY
-    if (!apiKey) return 'Error: OpenAI API key not found. Please check your .env file.'
     try {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      // Call Netlify serverless function (API key is hidden on server)
+      const response = await fetch('/.netlify/functions/openai', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-        body: JSON.stringify({
-          model: 'gpt-4',
-          messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: prompt }],
-          temperature: 0.7
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, systemPrompt })
       })
+      
       const data = await response.json()
+      
+      if (!response.ok) {
+        return `Error: ${data.error || 'Failed to contact AI service'}`
+      }
+      
       return data.choices[0].message.content
     } catch (error) {
       return `Error: ${error.message}`
